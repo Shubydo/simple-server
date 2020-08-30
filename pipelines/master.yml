@@ -1,36 +1,99 @@
-trigger:
-  branches:
-   include:
-    - "master"
-
-pr: none # Disable PR trigger
-
-pool:
-  vmImage: "ubuntu-latest"
-
 variables:
   - name: appName
     value: "simple-server"
-  - name: region
+  - name: ecrAccountId
+    default: "042652285553"
+  - name: ecrRegion
     value: "us-east-1"
+  - name: awsCredentials
+    value: "AWS"
+  - name: "region"
+  - name: "clusterName"
+    value: "demo"
+  - name: "env"
+    value: "demo"
+  - name: "namespace"
+    value: "apps"
+
 
 stages:
   - stage: BuildAndPushImage
-    displayName: "Build and push image to ECR"
+    displayName: Build and push image
     jobs:
-      - job:
+      - job: Build
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
           - task: AWSShellScript@1
             inputs:
-              credentials: ""
-              region: ${{ variables.region }}
+              awsCredentials: ${{ variables.awsCredentials }}
+              regionName: ${{ variables.ecrRegion }}
               scriptType: "inline"
               inlineScript: |
-                # Log in to ECR
- 
-                # Build and push image
+                set -ex -o pipefail
+                GIT_COMMIT_SHORT=$(git rev-parse --verify --short HEAD)
+                TAG=git-${GIT_COMMIT_SHORT}
+                ECR_REPO=${{ variables.ecrAccountId }}.dkr.ecr.${{ variables.ecrRegion }}.amazonaws.com/${{ variables.appName }}
+                TAG_EXISTS=$(aws ecr list-images --repository-name app/${{ variables.appName }} | jq --arg tag $TAG '.imageIds[] | select(.imageTag == $tag)')
+
+                if [ -z "$TAG_EXISTS" ]; then
+                  docker tag ${{ variables.appName }}:$(Build.BuildId) ${ECR_REPO}:${TAG}
+                  set +x
+                  $(aws ecr get-login --registry-id ${{ variables.ecrAccountId }} --no-include-email)
+                  set -x
+                  docker push ${ECR_REPO}:${TAG}
+                else
+                  echo "Image tag ${TAG} already exists, skipping image push"
+                fi
 
   - stage: DeployToEKS
-    displayName: "Deploy to EKS"
+    displayName: Deploy to ${{ variables.clusterName }}
     dependsOn: BuildAndPushImage
+    pool: self-hosted-EKS
     jobs:
-      - deploy:
+      - deployment: DeployToEKS
+        displayName: Deploy to ${{ variables.clusterName }}
+        environment: ${{ variables.appName }}-${{ variables.env }}
+        workspace:
+          clean: all # Self-hosted agents don't automatically clean the workspace between runs
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: none # disable automatically downloading artifact
+                - task: AWSShellScript@1
+                  displayName: Deploy to ${{ variables.env }}
+                  inputs:
+                    awsCredentials: ${{ variables.awsCredentials }}
+                    regionName: ${{ variables.region }}
+                    scriptType: "inline"
+                    inlineScript: |
+                      set -ex -o pipefail
+
+                      GIT_COMMIT=$(git rev-parse --verify HEAD)
+                      GIT_COMMIT_SHORT=$(git rev-parse --verify --short HEAD)
+                      TAG=git-$GIT_COMMIT_SHORT
+
+                      VALUES_FILE=chart/values.yaml
+
+                      echo "*** Downloading kubeconfig ***"
+                      aws eks update-kubeconfig ${{ variables.clusterName }}
+
+                      echo "*** Update helm chart ***"
+                      sed -ie "s/appVersion:.*/appVersion:\ $TAG/" chart/Chart.yaml
+
+                      echo "*** Deploying ${{ variables.appName }}-${{ variables.env }} ***"
+                      SET_VALUES="image.tag=$TAG,gitHash=$GIT_COMMIT"
+                      echo "SET_VALUES:\ '$SET_VALUES'"
+                      helm upgrade --install --atomic -n ${{ variables.namespace }} ${{ variables.appName }}-${{ variables.env }} chart -f $VALUES_FILE --set $SET_VALUES
+
+            on:
+              failure:
+                steps:
+                  - bash: |
+                      echo "Deployment to ${{ variables.env }} failed"
+
+              success:
+                steps:
+                  - bash: |
+                      echo "Running tests!"
