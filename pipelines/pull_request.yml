@@ -1,4 +1,4 @@
-trigger: none
+trigger: none # Disable CI trigger
 pr: 
   branches:
     include:
@@ -10,8 +10,6 @@ pool:
 variables:
   - name: appName
     value: "simple-server"
-  - name: goVersion
-    value: 1.15
 
 stages:
   - stage: Build
@@ -21,18 +19,3 @@ stages:
         steps:
           - bash: |
               docker build -t ${{ variables.appName }} .
-            
-  - stage: Test
-    displayName: "Run tests"
-    dependsOn: Build // only run if Build succeeded
-    jobs:
-      - job:
-        steps:
-          - task: GoTool@0
-            inputs:
-              version: ${{ variables.goVersion }}
-          - task: Go@0
-            inputs:
-              command: 'test'
-          
-            
