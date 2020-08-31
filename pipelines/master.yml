@@ -33,7 +33,7 @@ stages:
                 GIT_COMMIT_SHORT=$(git rev-parse --verify --short HEAD)
                 TAG=git-${GIT_COMMIT_SHORT}
                 ECR_REPO=${{ variables.ecrAccountId }}.dkr.ecr.${{ variables.ecrRegion }}.amazonaws.com/${{ variables.appName }}
-                TAG_EXISTS=$(aws ecr list-images --repository-name app/${{ variables.appName }} | jq --arg tag $TAG '.imageIds[] | select(.imageTag == $tag)')
+                TAG_EXISTS=$(aws ecr list-images --repository-name ${{ variables.appName }} | jq --arg tag $TAG '.imageIds[] | select(.imageTag == $tag)')
 
                 if [ -z "$TAG_EXISTS" ]; then
                   docker tag ${{ variables.appName }}:$(Build.BuildId) ${ECR_REPO}:${TAG}
