@@ -1,0 +1,36 @@
+trigger:
+  branches:
+   include:
+    - "master"
+
+pr: none # Disable PR trigger
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  - name: appName
+    value: "simple-server"
+  - name: region
+    value: "us-east-1"
+
+stages:
+  - stage: BuildAndPushImage
+    displayName: "Build and push image to ECR"
+    jobs:
+      - job:
+          - task: AWSShellScript@1
+            inputs:
+              credentials: ""
+              region: ${{ variables.region }}
+              scriptType: "inline"
+              inlineScript: |
+                # Log in to ECR
+ 
+                # Build and push image
+
+  - stage: DeployToEKS
+    displayName: "Deploy to EKS"
+    dependsOn: BuildAndPushImage
+    jobs:
+      - deploy:
