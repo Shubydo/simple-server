@@ -7,11 +7,11 @@ variables:
     value: "us-east-1"
   - name: awsCredentials
     value: "AWS"
-  - name: "clusterName"
+  - name: clusterName
     value: "demo"
-  - name: "env"
+  - name: env
     value: "demo"
-  - name: "namespace"
+  - name: namespace
     value: "apps"
 
 
@@ -21,7 +21,7 @@ stages:
     jobs:
       - job: Build
         pool:
-          vmImage: "ubuntu-18.04"
+          vmImage: "ubuntu-latest"
         steps:
           - task: AWSShellScript@1
             inputs:
