@@ -46,7 +46,7 @@ stages:
                 fi
 
   - stage: DeployToEKS
-    displayName: Deploy to ${{ variables.clusterName }}
+    displayName: Deploy to ${{ variables.clusterName }} EKS
     dependsOn: BuildAndPushImage
     pool: self-hosted-EKS
     jobs:
