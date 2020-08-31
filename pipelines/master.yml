@@ -2,12 +2,11 @@ variables:
   - name: appName
     value: "simple-server"
   - name: ecrAccountId
-    default: "042652285553"
+    value: "042652285553"
   - name: ecrRegion
     value: "us-east-1"
   - name: awsCredentials
     value: "AWS"
-  - name: "region"
   - name: "clusterName"
     value: "demo"
   - name: "env"
